@@ -11,7 +11,7 @@ load_dotenv()
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # 🌟 THE STAR IS HERE: This sets the icon in your browser tab
-st.set_page_config(page_title="Sia.AI", page_icon="logo.png")
+st.set_page_config(page_title="Sia.AI")
 
 # 2. Define Custom Styles (Galaxy Theme 🌌 + Centering Tweaks)
 def setup_custom_styles():
@@ -52,7 +52,7 @@ col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
     # 🖼️ LOGO ENABLED: This will display your logo.png
-    st.image("logo.png", use_column_width=True)
+    #st.image("logo.png", use_column_width=True)
 
 # Main Title (Clean text to match the logo)
 st.title("Sia.AI")
