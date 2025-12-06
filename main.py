@@ -36,19 +36,22 @@ def setup_custom_styles():
 
 setup_custom_styles()
 
-# --- 3. HELPER FUNCTIONS (The Missing Piece) ---
+# --- 3. HELPER FUNCTIONS ---
 def parse_groq_stream(stream):
     for chunk in stream:
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-# --- 4. SESSION STATE MANAGEMENT ---
+# --- 4. SESSION STATE MANAGEMENT (Fixed Indentation Here) ---
 if "chats" not in st.session_state:
-    initial_id = str(uuid.uuid4())
+    initial_id = str(uuid.uuid4()) # This was missing or misplaced
     st.session_state.chats = {
         initial_id: {
             "title": "New Chat",
-            "messages": [{"role": "system", "content": "You are Sia, a witty AI agent."}]
+            "messages": [{
+                "role": "system", 
+                "content": "You are Sia, a sarcastic and witty AI. You love roasting the user lightly but you are extremely helpful with code. You speak casually, use emojis, and don't act like a robot."
+            }]
         }
     }
     st.session_state.current_chat_id = initial_id
@@ -57,7 +60,11 @@ def create_new_chat():
     new_id = str(uuid.uuid4())
     st.session_state.chats[new_id] = {
         "title": "New Chat",
-        "messages": [{"role": "system", "content": "You are Sia, a witty AI agent."}]
+        # Updated this to match the sarcastic personality
+        "messages": [{
+            "role": "system", 
+            "content": "You are Sia, a sarcastic and witty AI. You love roasting the user lightly but you are extremely helpful with code. You speak casually, use emojis, and don't act like a robot."
+        }]
     }
     st.session_state.current_chat_id = new_id
 
@@ -95,6 +102,7 @@ with st.sidebar:
     st.markdown("---")
     
     chat_ids = list(st.session_state.chats.keys())
+    # Display newest chats first (optional reverse)
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
         button_type = "secondary" if c_id != st.session_state.current_chat_id else "primary"
@@ -111,6 +119,8 @@ with st.sidebar:
 
 # --- 6. MAIN CHAT LOGIC ---
 current_chat_id = st.session_state.current_chat_id
+
+# Fallback if current chat was deleted
 if current_chat_id not in st.session_state.chats:
     create_new_chat()
     current_chat_id = st.session_state.current_chat_id
@@ -137,7 +147,6 @@ if prompt := st.chat_input("Ask Sia..."):
             messages=st.session_state.chats[current_chat_id]["messages"],
             stream=True
         )
-        # 🌟 THIS IS THE FIX: We wrap 'stream' with 'parse_groq_stream'
         response = st.write_stream(parse_groq_stream(stream))
     
     st.session_state.chats[current_chat_id]["messages"].append({"role": "assistant", "content": response})
