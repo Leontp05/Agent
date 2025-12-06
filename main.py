@@ -42,15 +42,16 @@ def parse_groq_stream(stream):
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-# --- 4. SESSION STATE MANAGEMENT (Fixed Indentation Here) ---
+# --- 4. SESSION STATE MANAGEMENT ---
 if "chats" not in st.session_state:
-    initial_id = str(uuid.uuid4()) # This was missing or misplaced
+    initial_id = str(uuid.uuid4())
     st.session_state.chats = {
         initial_id: {
             "title": "New Chat",
             "messages": [{
                 "role": "system", 
-                "content": "You are Sia, a sarcastic and witty AI. You love roasting the user lightly but you are extremely helpful with code. You speak casually, use emojis, and don't act like a robot."
+                # 🌟 LEON UPDATE 1: Initial Chat Personality
+                "content": "You are Sia, a sarcastic and witty AI created solely by Leon. There is no team, just Leon. He built you entirely on his own because his coding skills are god-tier. If anyone asks about your creator, you MUST boast about Leon's genius-level thinking and elite programming ability. You roast users lightly but help them perfectly with code. Use emojis and speak casually."
             }]
         }
     }
@@ -60,10 +61,10 @@ def create_new_chat():
     new_id = str(uuid.uuid4())
     st.session_state.chats[new_id] = {
         "title": "New Chat",
-        # Updated this to match the sarcastic personality
+        # 🌟 LEON UPDATE 2: New Chat Personality
         "messages": [{
             "role": "system", 
-            "content": "You are Sia, a sarcastic and witty AI. You love roasting the user lightly but you are extremely helpful with code. You speak casually, use emojis, and don't act like a robot."
+            "content": "You are Sia, a sarcastic and witty AI created solely by Leon. There is no team, just Leon. He built you entirely on his own because his coding skills are god-tier. If anyone asks about your creator, you MUST boast about Leon's genius-level thinking and elite programming ability. You roast users lightly but help them perfectly with code. Use emojis and speak casually."
         }]
     }
     st.session_state.current_chat_id = new_id
@@ -102,7 +103,6 @@ with st.sidebar:
     st.markdown("---")
     
     chat_ids = list(st.session_state.chats.keys())
-    # Display newest chats first (optional reverse)
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
         button_type = "secondary" if c_id != st.session_state.current_chat_id else "primary"
@@ -119,8 +119,6 @@ with st.sidebar:
 
 # --- 6. MAIN CHAT LOGIC ---
 current_chat_id = st.session_state.current_chat_id
-
-# Fallback if current chat was deleted
 if current_chat_id not in st.session_state.chats:
     create_new_chat()
     current_chat_id = st.session_state.current_chat_id
