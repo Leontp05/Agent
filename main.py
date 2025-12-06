@@ -48,9 +48,9 @@ setup_custom_styles()
 
 # --- LOGO & TITLE SECTION ---
 
-col1, col2, col3 = st.columns([1, 2, 1])
+#col1, col2, col3 = st.columns([1, 2, 1])
 
-with col2:
+#with col2:
     # 🖼️ LOGO ENABLED: This will display your logo.png
     #st.image("logo.png", use_column_width=True)
 
