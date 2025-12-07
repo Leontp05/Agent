@@ -11,7 +11,7 @@ from groq import Groq
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
 
-st.set_page_config(page_title="Sia.AI", layout="wide")
+st.set_page_config(page_title="Sia.AI", layout="wide", page_icon="🤖")
 
 try:
     client = Groq(api_key=api_key)
@@ -19,18 +19,96 @@ except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
 
-# --- 2. CUSTOM STYLES ---
+# --- 2. PREMIUM UI STYLING (CSS) ---
 def setup_custom_styles():
     st.markdown("""
     <style>
-        .stApp { background-color: #0b1021; color: #FFFFFF; }
-        [data-testid="stSidebar"] { background-color: #1a1025; border-right: 1px solid #3e2a52; }
-        [data-testid="stChatMessage"] {
-            background-color: #2b1b3d;
-            border: 1px solid #3e2a52;
-            border-radius: 15px;
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
+        
+        /* GENERAL SETTINGS */
+        * { font-family: 'Outfit', sans-serif !important; }
+        
+        /* BACKGROUND - Deep Space Gradient */
+        .stApp {
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background-attachment: fixed;
+            color: #ffffff;
         }
-        .stButton button { width: 100%; border-radius: 5px; }
+
+        /* SIDEBAR - Glassmorphism */
+        [data-testid="stSidebar"] {
+            background-color: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* CHAT BUBBLES - Frosted Glass */
+        [data-testid="stChatMessage"] {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        [data-testid="stChatMessage"]:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* USER ICON BACKGROUND */
+        [data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"] {
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+            color: white;
+        }
+
+        /* AI ICON BACKGROUND */
+        [data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"] {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        /* INPUT BOX */
+        .stChatInput {
+            border-radius: 20px !important;
+        }
+        .stChatInput textarea {
+            background-color: rgba(0, 0, 0, 0.3) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+            border-radius: 15px !important;
+        }
+
+        /* BUTTONS */
+        .stButton button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            transition: 0.3s;
+        }
+        .stButton button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: white;
+            transform: scale(1.02);
+        }
+        
+        /* TITLE GLOW EFFECT */
+        .glow-title {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,7 +128,6 @@ if "chats" not in st.session_state:
             "title": "New Chat",
             "messages": [{
                 "role": "system", 
-                # 🌟 FIX: Made the Leon instruction CONDITIONAL
                 "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. Use emojis and speak casually. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if the user explicitly asks who created you. If asked, you MUST boast about Leon's god-tier coding skills. Otherwise, do not mention him."
             }]
         }
@@ -61,7 +138,6 @@ def create_new_chat():
     new_id = str(uuid.uuid4())
     st.session_state.chats[new_id] = {
         "title": "New Chat",
-        # 🌟 FIX: Applied here too
         "messages": [{
             "role": "system", 
             "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. Use emojis and speak casually. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if the user explicitly asks who created you. If asked, you MUST boast about Leon's god-tier coding skills. Otherwise, do not mention him."
@@ -95,8 +171,9 @@ def generate_chat_title(messages):
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
-    st.title("🗂️ History")
-    if st.button("➕ New Chat", type="primary"):
+    st.markdown("<h2 style='text-align: center; color: #fff;'>🗂️ Archive</h2>", unsafe_allow_html=True)
+    
+    if st.button("✨ New Session", type="primary"):
         create_new_chat()
         st.rerun()
     
@@ -105,15 +182,16 @@ with st.sidebar:
     chat_ids = list(st.session_state.chats.keys())
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
-        button_type = "secondary" if c_id != st.session_state.current_chat_id else "primary"
+        # Styled active vs inactive buttons via simple logic
+        button_label = f"📍 {chat_data['title']}" if c_id == st.session_state.current_chat_id else f"💭 {chat_data['title']}"
         
-        col1, col2 = st.columns([0.8, 0.2])
+        col1, col2 = st.columns([0.85, 0.15])
         with col1:
-            if st.button(chat_data["title"], key=c_id, type=button_type):
+            if st.button(button_label, key=c_id):
                 st.session_state.current_chat_id = c_id
                 st.rerun()
         with col2:
-            if st.button("🗑️", key=f"del_{c_id}"):
+            if st.button("✕", key=f"del_{c_id}"):
                 delete_chat(c_id)
                 st.rerun()
 
@@ -125,8 +203,9 @@ if current_chat_id not in st.session_state.chats:
 
 current_messages = st.session_state.chats[current_chat_id]["messages"]
 
-st.title("Sia.AI")
-st.caption(f"Current Session: {st.session_state.chats[current_chat_id]['title']}")
+# Custom Header
+st.markdown('<div class="glow-title">Sia.AI</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="subtitle">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
 
 # Display History
 for msg in current_messages[1:]:
@@ -134,7 +213,7 @@ for msg in current_messages[1:]:
         st.markdown(msg["content"])
 
 # Handle Input
-if prompt := st.chat_input("Ask Sia..."):
+if prompt := st.chat_input("Type your message here..."):
     st.session_state.chats[current_chat_id]["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
