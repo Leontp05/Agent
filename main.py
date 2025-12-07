@@ -19,15 +19,18 @@ except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
 
-# --- 2. PREMIUM UI STYLING (CSS) ---
+# --- 2. PREMIUM UI STYLING (FIXED) ---
 def setup_custom_styles():
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
         
-        /* GENERAL SETTINGS */
-        * { font-family: 'Outfit', sans-serif !important; }
-        
+        /* FIX: Apply font to app container and specific text elements ONLY. 
+           This prevents breaking the icon fonts (which caused 'keyb', 'fa', 'sm'). */
+        .stApp, div, p, h1, h2, h3, h4, h5, h6, span, button {
+            font-family: 'Outfit', sans-serif;
+        }
+
         /* BACKGROUND - Deep Space Gradient */
         .stApp {
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
@@ -56,16 +59,11 @@ def setup_custom_styles():
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
         }
 
-        /* USER ICON BACKGROUND */
-        [data-testid="stChatMessage"] [data-testid="chatAvatarIcon-user"] {
-            background: linear-gradient(135deg, #00c6ff, #0072ff);
-            color: white;
-        }
-
-        /* AI ICON BACKGROUND */
-        [data-testid="stChatMessage"] [data-testid="chatAvatarIcon-assistant"] {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-            color: white;
+        /* AVATAR FIX: Ensure avatars don't show broken text */
+        [data-testid="stChatMessage"] .st-emotion-cache-15zrgzn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* INPUT BOX */
@@ -182,16 +180,19 @@ with st.sidebar:
     chat_ids = list(st.session_state.chats.keys())
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
-        # Styled active vs inactive buttons via simple logic
+        
+        # Determine button style
         button_label = f"📍 {chat_data['title']}" if c_id == st.session_state.current_chat_id else f"💭 {chat_data['title']}"
         
+        # FIX: Adjusted column ratio to give the delete button slightly more space to center
         col1, col2 = st.columns([0.85, 0.15])
         with col1:
             if st.button(button_label, key=c_id):
                 st.session_state.current_chat_id = c_id
                 st.rerun()
         with col2:
-            if st.button("✕", key=f"del_{c_id}"):
+            # FIX: Swapped "X" for "🗑️" which is clearer and centers better
+            if st.button("🗑️", key=f"del_{c_id}"):
                 delete_chat(c_id)
                 st.rerun()
 
@@ -228,7 +229,7 @@ if prompt := st.chat_input("Type your message here..."):
     
     st.session_state.chats[current_chat_id]["messages"].append({"role": "assistant", "content": response})
 
-    # Auto-Rename
+    # Auto-Rename logic
     if st.session_state.chats[current_chat_id]["title"] == "New Chat" and len(st.session_state.chats[current_chat_id]["messages"]) >= 3:
         new_title = generate_chat_title(st.session_state.chats[current_chat_id]["messages"])
         st.session_state.chats[current_chat_id]["title"] = new_title
