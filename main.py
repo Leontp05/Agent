@@ -26,8 +26,8 @@ def setup_custom_styles():
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
         
         /* FIX: Apply font to app container and specific text elements ONLY. 
-           This prevents breaking the icon fonts (which caused 'keyb', 'fa', 'sm'). */
-        .stApp, div, p, h1, h2, h3, h4, h5, h6, span, button {
+           We removed '!important' and the '*' wildcard to stop breaking icons. */
+        .stApp, p, h1, h2, h3, h4, h5, h6, div, span, button {
             font-family: 'Outfit', sans-serif;
         }
 
