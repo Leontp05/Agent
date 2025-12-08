@@ -84,6 +84,13 @@ def setup_custom_styles():
             color: #fff;
             display: inline-block;
         }
+        /* Force Sidebar Buttons to Truncate */
+        .stButton button {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -142,27 +149,41 @@ def delete_chat(chat_id):
             else:
                 create_new_chat()
 
+# 🌟 STRICT TITLE GENERATOR 🌟
 def generate_chat_title(messages):
     try:
         user_text = ""
+        # Find the first user message (including PDFs/Images text)
         for m in messages:
             if m['role'] == 'user':
                 if isinstance(m['content'], str):
                     user_text = m['content']
                 elif isinstance(m['content'], list):
-                    user_text = m['content'][0]['text']
+                    for part in m['content']:
+                        if part['type'] == 'text':
+                            user_text += part['text'] + " "
                 break
         
-        if not user_text: return "New Chat"
+        # If no text found (rare), default
+        if not user_text.strip(): return "New Chat"
+        
+        # Limit context sent to title generator to save tokens/confusion
+        safe_context = user_text[:500] 
         
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "Summarize into 3 words. No quotes."},
-                {"role": "user", "content": user_text}
+                {"role": "system", "content": "You are a strict title generator. Output a 3-5 word summary of the user's text. No quotes. No intro. No special characters. Just the words."},
+                {"role": "user", "content": safe_context}
             ]
         )
-        return completion.choices[0].message.content.strip()
+        title = completion.choices[0].message.content.strip().replace('"', '').replace("Title:", "")
+        
+        # 🌟 SAFETY LOCK: Force truncate if AI disobeys
+        if len(title) > 30:
+            title = title[:27] + "..."
+            
+        return title
     except:
         return "New Chat"
 
@@ -178,7 +199,13 @@ with st.sidebar:
     chat_ids = list(st.session_state.chats.keys())
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
-        button_label = f"📍 {chat_data['title']}" if c_id == st.session_state.current_chat_id else f"💭 {chat_data['title']}"
+        
+        # Display logic is safe here, but we also enforce strict generation above
+        display_title = chat_data['title']
+        if len(display_title) > 30:
+             display_title = display_title[:27] + "..."
+             
+        button_label = f"📍 {display_title}" if c_id == st.session_state.current_chat_id else f"💭 {display_title}"
         col1, col2 = st.columns([0.85, 0.15])
         with col1:
             if st.button(button_label, key=c_id):
@@ -199,21 +226,25 @@ current_messages = st.session_state.chats[current_chat_id]["messages"]
 
 # HEADER
 st.markdown('<div class="glow-title">Sia.AI</div>', unsafe_allow_html=True)
-st.markdown(f'<div style="text-align:center; opacity:0.7; margin-bottom:20px;">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
 
-# 🌟 DISPLAY CHAT HISTORY (UPDATED TO HIDE RAW PDF TEXT) 🌟
+# 🌟 CLEAN SESSION DISPLAY
+session_title = st.session_state.chats[current_chat_id]["title"]
+# Double check length for the header display too
+if len(session_title) > 40: session_title = session_title[:37] + "..."
+st.markdown(f'<div style="text-align:center; opacity:0.7; margin-bottom:20px;">Session: {session_title}</div>', unsafe_allow_html=True)
+
+# DISPLAY CHAT HISTORY
 for msg in current_messages[1:]:
     with st.chat_message(msg["role"]):
         if isinstance(msg["content"], str):
-            # CHECK: Is this a big PDF prompt?
+            # Clean PDF display logic
             if "User uploaded a PDF. Here is the content:" in msg["content"]:
-                # Logic: We split the string and only show the User Question part
                 try:
                     display_text = msg["content"].split("User Question:")[-1].strip()
                     st.markdown(display_text)
                     st.caption("📄 [Attached PDF used for context]")
                 except:
-                    st.markdown(msg["content"]) # Fallback if split fails
+                    st.markdown("📄 [PDF Content Analyzed]")
             else:
                 st.markdown(msg["content"])
         elif isinstance(msg["content"], list):
@@ -260,17 +291,16 @@ if prompt := st.chat_input("Type your message here..."):
         elif "pdf" in file_type:
             with st.spinner("Reading PDF..."):
                 pdf_text = read_pdf(uploaded_file)
-                # We store the full text so the AI sees it, but use the separator "User Question:" to hide it in UI later
+                # Keep full content for AI, but split for cleaner UI display later
                 message_content = f"User uploaded a PDF. Here is the content:\n\n{pdf_text}\n\nUser Question: {prompt}"
             model_to_use = "llama-3.3-70b-versatile" 
         
-        # Reset uploader
         st.session_state.uploader_key += 1
 
     # Add to History
     st.session_state.chats[current_chat_id]["messages"].append({"role": "user", "content": message_content})
     
-    # IMMEDIATE DISPLAY (Clean view)
+    # UI Display
     with st.chat_message("user"):
         if uploaded_file and "image" in uploaded_file.type:
             st.image(uploaded_file, caption="Uploaded Image", width=300)
