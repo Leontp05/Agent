@@ -58,11 +58,20 @@ def setup_custom_styles():
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
         }
-        /* Custom File Uploader Style */
-        [data-testid="stExpander"] {
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Custom Popover Button Style */
+        [data-testid="stPopover"] > div > button {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 50%; /* Make it round */
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+        }
+        [data-testid="stPopover"] > div > button:hover {
+            background-color: #0072ff;
+            border-color: #00c6ff;
+            color: white;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -143,7 +152,7 @@ def generate_chat_title(messages):
     except:
         return "New Chat"
 
-# --- 5. SIDEBAR (History Only) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #fff;'>🗂️ Archive</h2>", unsafe_allow_html=True)
     if st.button("✨ New Session", type="primary"):
@@ -178,11 +187,7 @@ current_messages = st.session_state.chats[current_chat_id]["messages"]
 st.markdown('<div class="glow-title">Sia.AI</div>', unsafe_allow_html=True)
 st.markdown(f'<div style="text-align:center; opacity:0.7; margin-bottom:20px;">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
 
-# 🌟 NEW UPLOADER LOCATION (Above Chat)
-with st.expander("📎 Attach PDF or Image", expanded=False):
-    uploaded_file = st.file_uploader("Upload a file to analyze:", type=["pdf", "jpg", "png", "jpeg"], label_visibility="collapsed")
-
-# Display History
+# Display Chat History FIRST
 for msg in current_messages[1:]:
     with st.chat_message(msg["role"]):
         if isinstance(msg["content"], str):
@@ -194,32 +199,37 @@ for msg in current_messages[1:]:
                 elif part["type"] == "image_url":
                     st.image(part["image_url"]["url"], width=300)
 
-# Handle Input
+# --- THE "PLUS" BUTTON ---
+# We use columns to push the button to the left
+col1, col2 = st.columns([0.05, 0.95])
+with col1:
+    # 🌟 THIS IS THE "PLUS" POP-UP
+    with st.popover("➕"):
+        st.markdown("### Upload File")
+        uploaded_file = st.file_uploader("Attach PDF or Image", type=["pdf", "jpg", "png", "jpeg"], label_visibility="collapsed")
+
+# --- THE CHAT INPUT ---
 if prompt := st.chat_input("Type your message here..."):
     
-    model_to_use = "llama-3.3-70b-versatile" # Default text model
+    model_to_use = "llama-3.3-70b-versatile" 
     message_content = prompt
 
-    # HANDLE FILE UPLOAD LOGIC
     if uploaded_file:
         file_type = uploaded_file.type
         
-        # 1. IMAGE HANDLING
         if "image" in file_type:
             base64_image = encode_image(uploaded_file)
             message_content = [
                 {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
             ]
-            model_to_use = "llama-3.2-90b-vision-preview" # Switch to Vision Model
+            model_to_use = "llama-3.2-90b-vision-preview" 
         
-        # 2. PDF HANDLING
         elif "pdf" in file_type:
             with st.spinner("Reading PDF..."):
                 pdf_text = read_pdf(uploaded_file)
-                # We inject the PDF content into the user message
                 message_content = f"User uploaded a PDF. Here is the content:\n\n{pdf_text}\n\nUser Question: {prompt}"
-            model_to_use = "llama-3.3-70b-versatile" # Stay on Text Model
+            model_to_use = "llama-3.3-70b-versatile" 
 
     # Add to History
     st.session_state.chats[current_chat_id]["messages"].append({"role": "user", "content": message_content})
