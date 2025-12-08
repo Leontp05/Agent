@@ -58,9 +58,11 @@ def setup_custom_styles():
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
         }
-        /* Fix for broken icons */
-        [data-testid="stSidebar"] button {
-             border: 1px solid rgba(255,255,255,0.1);
+        /* Custom File Uploader Style */
+        [data-testid="stExpander"] {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
     """, unsafe_allow_html=True)
@@ -141,7 +143,7 @@ def generate_chat_title(messages):
     except:
         return "New Chat"
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR (History Only) ---
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #fff;'>🗂️ Archive</h2>", unsafe_allow_html=True)
     if st.button("✨ New Session", type="primary"):
@@ -150,12 +152,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # MULTI-MODAL UPLOADER (PDF + IMAGES)
-    st.markdown("### 📎 Attachments")
-    uploaded_file = st.file_uploader("Upload PDF or Image:", type=["pdf", "jpg", "png", "jpeg"])
-    
-    st.markdown("---")
-
     chat_ids = list(st.session_state.chats.keys())
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
@@ -178,8 +174,13 @@ if current_chat_id not in st.session_state.chats:
 
 current_messages = st.session_state.chats[current_chat_id]["messages"]
 
+# HEADER
 st.markdown('<div class="glow-title">Sia.AI</div>', unsafe_allow_html=True)
 st.markdown(f'<div style="text-align:center; opacity:0.7; margin-bottom:20px;">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
+
+# 🌟 NEW UPLOADER LOCATION (Above Chat)
+with st.expander("📎 Attach PDF or Image", expanded=False):
+    uploaded_file = st.file_uploader("Upload a file to analyze:", type=["pdf", "jpg", "png", "jpeg"], label_visibility="collapsed")
 
 # Display History
 for msg in current_messages[1:]:
