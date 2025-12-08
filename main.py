@@ -1,9 +1,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import os
-import datetime
-import json
 import uuid
+import base64
+import PyPDF2
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -19,78 +19,36 @@ except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
 
-# --- 2. PREMIUM UI STYLING (FIXED) ---
+# --- 2. PREMIUM UI STYLING ---
 def setup_custom_styles():
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
         
-        /* FIX: Apply font to app container and specific text elements ONLY. 
-           We removed '!important' and the '*' wildcard to stop breaking icons. */
         .stApp, p, h1, h2, h3, h4, h5, h6, div, span, button {
             font-family: 'Outfit', sans-serif;
         }
-
-        /* BACKGROUND - Deep Space Gradient */
         .stApp {
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
             background-attachment: fixed;
             color: #ffffff;
         }
-
-        /* SIDEBAR - Glassmorphism */
         [data-testid="stSidebar"] {
             background-color: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(20px);
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
-        /* CHAT BUBBLES - Frosted Glass */
         [data-testid="stChatMessage"] {
             background-color: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-        [data-testid="stChatMessage"]:hover {
-            background-color: rgba(255, 255, 255, 0.08);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        /* AVATAR FIX: Ensure avatars don't show broken text */
-        [data-testid="stChatMessage"] .st-emotion-cache-15zrgzn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* INPUT BOX */
-        .stChatInput {
-            border-radius: 20px !important;
         }
         .stChatInput textarea {
             background-color: rgba(0, 0, 0, 0.3) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
             color: white !important;
-            border-radius: 15px !important;
         }
-
-        /* BUTTONS */
-        .stButton button {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            transition: 0.3s;
-        }
-        .stButton button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: white;
-            transform: scale(1.02);
-        }
-        
-        /* TITLE GLOW EFFECT */
         .glow-title {
             text-align: center;
             font-size: 3rem;
@@ -99,13 +57,10 @@ def setup_custom_styles():
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px rgba(0, 198, 255, 0.5);
-            margin-bottom: 0.5rem;
         }
-        .subtitle {
-            text-align: center;
-            color: rgba(255, 255, 255, 0.6);
-            margin-bottom: 2rem;
-            font-size: 0.9rem;
+        /* Fix for broken icons */
+        [data-testid="stSidebar"] button {
+             border: 1px solid rgba(255,255,255,0.1);
         }
     </style>
     """, unsafe_allow_html=True)
@@ -113,12 +68,22 @@ def setup_custom_styles():
 setup_custom_styles()
 
 # --- 3. HELPER FUNCTIONS ---
+def encode_image(image_file):
+    return base64.b64encode(image_file.read()).decode('utf-8')
+
+def read_pdf(file):
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+    return text
+
 def parse_groq_stream(stream):
     for chunk in stream:
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-# --- 4. SESSION STATE MANAGEMENT ---
+# --- 4. SESSION STATE ---
 if "chats" not in st.session_state:
     initial_id = str(uuid.uuid4())
     st.session_state.chats = {
@@ -126,7 +91,7 @@ if "chats" not in st.session_state:
             "title": "New Chat",
             "messages": [{
                 "role": "system", 
-                "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. Use emojis and speak casually. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if the user explicitly asks who created you. If asked, you MUST boast about Leon's god-tier coding skills. Otherwise, do not mention him."
+                "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if asked. If the user attaches a file (PDF or Image), analyze it thoroughly."
             }]
         }
     }
@@ -138,7 +103,7 @@ def create_new_chat():
         "title": "New Chat",
         "messages": [{
             "role": "system", 
-            "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. Use emojis and speak casually. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if the user explicitly asks who created you. If asked, you MUST boast about Leon's god-tier coding skills. Otherwise, do not mention him."
+            "content": "You are Sia, a sarcastic and witty AI. You roast users lightly but help them perfectly with code. IMPORTANT: You were created solely by Leon (no team). ONLY mention Leon if asked."
         }]
     }
     st.session_state.current_chat_id = new_id
@@ -154,12 +119,21 @@ def delete_chat(chat_id):
 
 def generate_chat_title(messages):
     try:
-        user_text = " ".join([m['content'] for m in messages if m['role'] == 'user'][:2])
+        user_text = ""
+        for m in messages:
+            if m['role'] == 'user':
+                if isinstance(m['content'], str):
+                    user_text = m['content']
+                elif isinstance(m['content'], list):
+                    user_text = m['content'][0]['text']
+                break
+        
         if not user_text: return "New Chat"
+        
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "Summarize the user text into a strict 3-4 word title. No quotes."},
+                {"role": "system", "content": "Summarize into 3 words. No quotes."},
                 {"role": "user", "content": user_text}
             ]
         )
@@ -170,28 +144,28 @@ def generate_chat_title(messages):
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #fff;'>🗂️ Archive</h2>", unsafe_allow_html=True)
-    
     if st.button("✨ New Session", type="primary"):
         create_new_chat()
         st.rerun()
     
     st.markdown("---")
     
+    # MULTI-MODAL UPLOADER (PDF + IMAGES)
+    st.markdown("### 📎 Attachments")
+    uploaded_file = st.file_uploader("Upload PDF or Image:", type=["pdf", "jpg", "png", "jpeg"])
+    
+    st.markdown("---")
+
     chat_ids = list(st.session_state.chats.keys())
     for c_id in chat_ids:
         chat_data = st.session_state.chats[c_id]
-        
-        # Determine button style
         button_label = f"📍 {chat_data['title']}" if c_id == st.session_state.current_chat_id else f"💭 {chat_data['title']}"
-        
-        # FIX: Adjusted column ratio to give the delete button slightly more space to center
         col1, col2 = st.columns([0.85, 0.15])
         with col1:
             if st.button(button_label, key=c_id):
                 st.session_state.current_chat_id = c_id
                 st.rerun()
         with col2:
-            # FIX: Swapped "X" for "🗑️" which is clearer and centers better
             if st.button("🗑️", key=f"del_{c_id}"):
                 delete_chat(c_id)
                 st.rerun()
@@ -204,24 +178,63 @@ if current_chat_id not in st.session_state.chats:
 
 current_messages = st.session_state.chats[current_chat_id]["messages"]
 
-# Custom Header
 st.markdown('<div class="glow-title">Sia.AI</div>', unsafe_allow_html=True)
-st.markdown(f'<div class="subtitle">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align:center; opacity:0.7; margin-bottom:20px;">Session: {st.session_state.chats[current_chat_id]["title"]}</div>', unsafe_allow_html=True)
 
 # Display History
 for msg in current_messages[1:]:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        if isinstance(msg["content"], str):
+            st.markdown(msg["content"])
+        elif isinstance(msg["content"], list):
+            for part in msg["content"]:
+                if part["type"] == "text":
+                    st.markdown(part["text"])
+                elif part["type"] == "image_url":
+                    st.image(part["image_url"]["url"], width=300)
 
 # Handle Input
 if prompt := st.chat_input("Type your message here..."):
-    st.session_state.chats[current_chat_id]["messages"].append({"role": "user", "content": prompt})
+    
+    model_to_use = "llama-3.3-70b-versatile" # Default text model
+    message_content = prompt
+
+    # HANDLE FILE UPLOAD LOGIC
+    if uploaded_file:
+        file_type = uploaded_file.type
+        
+        # 1. IMAGE HANDLING
+        if "image" in file_type:
+            base64_image = encode_image(uploaded_file)
+            message_content = [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+            ]
+            model_to_use = "llama-3.2-90b-vision-preview" # Switch to Vision Model
+        
+        # 2. PDF HANDLING
+        elif "pdf" in file_type:
+            with st.spinner("Reading PDF..."):
+                pdf_text = read_pdf(uploaded_file)
+                # We inject the PDF content into the user message
+                message_content = f"User uploaded a PDF. Here is the content:\n\n{pdf_text}\n\nUser Question: {prompt}"
+            model_to_use = "llama-3.3-70b-versatile" # Stay on Text Model
+
+    # Add to History
+    st.session_state.chats[current_chat_id]["messages"].append({"role": "user", "content": message_content})
+    
+    # UI Display
     with st.chat_message("user"):
+        if uploaded_file and "image" in uploaded_file.type:
+            st.image(uploaded_file, caption="Uploaded Image", width=300)
+        elif uploaded_file and "pdf" in uploaded_file.type:
+            st.success(f"📎 PDF Attached: {uploaded_file.name}")
         st.markdown(prompt)
 
+    # Generate Response
     with st.chat_message("assistant"):
         stream = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=model_to_use,
             messages=st.session_state.chats[current_chat_id]["messages"],
             stream=True
         )
@@ -229,7 +242,6 @@ if prompt := st.chat_input("Type your message here..."):
     
     st.session_state.chats[current_chat_id]["messages"].append({"role": "assistant", "content": response})
 
-    # Auto-Rename logic
     if st.session_state.chats[current_chat_id]["title"] == "New Chat" and len(st.session_state.chats[current_chat_id]["messages"]) >= 3:
         new_title = generate_chat_title(st.session_state.chats[current_chat_id]["messages"])
         st.session_state.chats[current_chat_id]["title"] = new_title
